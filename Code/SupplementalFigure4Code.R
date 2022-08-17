@@ -5,7 +5,7 @@ library(tidyverse)
 library(GenomicFeatures)
 
 # make 'database' from the gff we used for exome processing
-txdb <- makeTxDbFromGFF("/igm/projects/Singlecell_analysis_projects/JLE_snRNA_objects/Tracy_Katie_JLE_snRNA/GRCh38_latest_genomic.gff.gz")
+txdb <- makeTxDbFromGFF("/GRCh38_latest_genomic.gff.gz")
 
 # get transcript lengths for all tx in our txdb
 txlens <- transcriptLengths(txdb) %>%
@@ -27,13 +27,13 @@ p47 <- readRDS(file = "~/p47.combined.aftrenameIdents.rds")
 
 #Load both genotyped tables for 3p and 5p
 #3p
-gt3 <- read.table("~/02_MethodsProject/01_DataFiles/JLE48_3p/JLE48_genotype_RHEB_3p.txt",
+gt3 <- read.table("~/P47_genotype_RHEB_3p.txt",
                   sep = "\t",
                   row.names = 1,
                   header = T)
 view(gt3)
 #5p
-gt5 <- read.table("~/02_MethodsProject/01_DataFiles/JLE48_5p/JLE48_genotype_RHEB_5p.txt",
+gt5 <- read.table("~/P47_genotype_RHEB_5p.txt",
                   sep = "\t",
                   row.names = 1,
                   header = T)
@@ -46,9 +46,9 @@ df3p <- tibble::rownames_to_column(gt3, "barcodes")
 #5p
 df5p <- tibble::rownames_to_column(gt5, "barcodes")
 
-#Add genotyped calls to JLE48 Dataset
+#Add genotyped calls to P47 Dataset
 #Extract Barcodes
-metadata <- onlyJLE48@assays$RNA@counts@Dimnames[[2]]
+metadata <- p47@assays$RNA@counts@Dimnames[[2]]
 
 #convert from chr to data frame
 metadata <- as.data.frame(metadata)
@@ -66,7 +66,7 @@ df5p$barcodes <- gsub("^(.{18})(.*)$", "\\1_2\\2", df5p$barcodes)
 view(df5p)
 
 #combine 3p and 5p
-#dfJLE48combined <- left_join(df3p, df5p, by = "barcodes")
+#dfp47combined <- left_join(df3p, df5p, by = "barcodes")
 df5_3 <- dplyr::full_join(df3p, df5p)
 #left_join allows for merging to occur between furthest left columns of 2 dataframes
 merged2 <- left_join(metadata, df5_3, by = c("metadata" = "barcodes"))
@@ -81,7 +81,7 @@ view(p47)
 #Change alt/ref to alt/alt
 p47$RHEB <- recode(p47$RHEB, 'alt/ref' = "alt/alt")
 
-p47@meta.data$orig.ident <- recode(p47@meta.data$orig.ident, 'jle483p' = '3p', 'jle485p' = '5p')
+p47@meta.data$orig.ident <- recode(p47@meta.data$orig.ident, 'p473p' = '3p', 'p4785p' = '5p')
 p47_rheb_combined_tsne <- TSNEPlot(object = p47, split.by = "orig.ident",
                                    label = T, 
                                    cols = c("azure2", "yellow","red", "black"),
@@ -117,12 +117,12 @@ p47_markers <- FeaturePlot(p47,
 p47_markers
 
 ####SaveRDS with RHEB in Metadata ####
-saveRDS(p47, file = "~/02_MethodsProject/02_AllJLE48Analysis/03_Integrated_JLE48_Object/p47withRHEB.rds")
+saveRDS(p47, file = "~/p47withRHEB.rds")
 as.data.frame(table(p47@meta.data$RHEB, p47@meta.data$orig.ident, p47@meta.data$final_clusters))
 
 ####P48####
 ####SLC35A2####
-p48 <- readRDS("~/02_MethodsProject/03_AllJLE49Analysis/03_IntegratedJLE49/JLE49.combined.aftcelltyping.rds")
+p48 <- readRDS("~/02_MethodsProject/12_FinalRScripts/p48.combined.aftcelltyping.rds")
 
 #Add SLC35A2 Genotyped calls to metadata
 
@@ -134,12 +134,12 @@ p48@meta.data$barcodes <- as.character(p48@assays$RNA@counts@Dimnames)
 
 #Load both genotyped tables for 3p and 5p
 #3p
-gt3 <- read.table(file = "~/02_MethodsProject/01_DataFiles/JLE49_3/JLE49_genotype_SLC35A2_3p.txt",
+gt3 <- read.table(file = "~/P48_genotype_SLC35A2_3p.txt",
                   sep = "\t",
                   header = T)
 view(gt3)
 #5p
-gt5 <- read.table(file = "~/02_MethodsProject/01_DataFiles/JLE49_5/JLE49_genotype_SLC35A2_5p.txt",
+gt5 <- read.table(file = "~/P48_genotype_SLC35A2_5p.txt",
                   sep = "\t",
                   header = T)
 view(gt5)
@@ -216,12 +216,11 @@ p48_markers <- FeaturePlot(p48,
 p48_markers
 
 ####SaveRDS with SLC35A2 in Metadata ####
-saveRDS(p48, file = "~/02_MethodsProject/03_AllJLE49Analysis/p48withSLC35A2.rds")
+saveRDS(p48, file = "~/p48withSLC35A2.rds")
 
 ####P49####
 ####PTPN11####
-p49 <- readRDS("~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/JLE50.combined.aftrenameidents.rds")
-
+p49 <- readRDS(file = "~/02_MethodsProject/12_FinalRScripts/p49.combined.aftrenameidents.rds")
 #Add PTPN11 Genotyped calls to metadata
 
 
@@ -233,12 +232,12 @@ p49@meta.data$barcodes <- as.character(p49@assays$RNA@counts@Dimnames)
 
 #Load both genotyped tables for 3p and 5p
 #3p
-gt3 <- read.table(file = "~/02_MethodsProject/01_DataFiles/JLE50_3p/JLE50_genotype_PTPN11_3p.txt",
+gt3 <- read.table(file = "~/P49_genotype_PTPN11_3p.txt",
                   sep = "\t",
                   header = T)
 view(gt3)
 #5p
-gt5 <- read.table(file = "~/02_MethodsProject/01_DataFiles/JLE50_5p/JLE50_genotype_PTPN11_5p.txt",
+gt5 <- read.table(file = "~/P49_genotype_PTPN11_5p.txt",
                   sep = "\t",
                   header = T)
 view(gt5)
@@ -315,11 +314,11 @@ p48_markers <- FeaturePlot(p48,
 p48_markers
 
 ####SaveRDS with PTPN11 in Metadata ####
-saveRDS(p49, file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/p49withPTPN11.rds")
-p49 <- readRDS(file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/p49withPTPN11.rds")
+saveRDS(p49, file = "~/p49withPTPN11.rds")
+p49 <- readRDS(file = "~/p49withPTPN11.rds")
 
 ####ROCK2####
-p49 <- readRDS(file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/p49aftrenameidents.rds")
+p49 <- readRDS(file = "~/02_MethodsProject/12_FinalRScripts/p49.combined.aftrenameidents.rds")
 
 #Chack CT labels 
 DimPlot(p49, reduction = "tsne", label = F)
@@ -333,12 +332,12 @@ p49@meta.data$barcodes <- as.character(p49@assays$RNA@counts@Dimnames)
 
 #Load both genotyped tables for 3p and 5p
 #3p
-gt3 <- read.table(file = "~/02_MethodsProject/01_DataFiles/JLE50_3p/JLE50_genotype_ROCK2_3p.txt",
+gt3 <- read.table(file = "~/P49_genotype_ROCK2_3p.txt",
                   sep = "\t",
                   header = T)
 view(gt3)
 #5p
-gt5 <- read.table(file = "~/02_MethodsProject/01_DataFiles/JLE50_5p/JLE50_genotype_ROCK2_5p.txt",
+gt5 <- read.table(file = "~/P49_genotype_ROCK2_5p.txt",
                   sep = "\t",
                   header = T)
 view(gt5)
@@ -390,7 +389,7 @@ p49_rock2_combined_tsne <- TSNEPlot(object = p49, split.by = "orig.ident",
                                     order = c("alt/alt" ,"alt/ref", "ref/ref","No Call" )) +
   ggtitle("ROCK2 mutation in Patient 49 GEX") 
 p49_rock2_combined_tsne
-#Amount of genotyped calls per kit in JLE49
+#Amount of genotyped calls per kit in P48
 as.data.frame(table(p49@meta.data$ROCK2, p49@meta.data$orig.ident, p49@active.ident))
 as.data.frame(table(p49@meta.data$ROCK2, p49@meta.data$orig.ident))
 
@@ -417,7 +416,7 @@ p49_markers <- FeaturePlot(p48,
 p48_markers
 
 ####SaveRDS with ROCK2 in Metadata ####
-saveRDS(p49, file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/p49withROCK2.rds")
+saveRDS(p49, file = "~/p49withROCK2.rds")
 
 
 

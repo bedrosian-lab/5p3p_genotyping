@@ -46,13 +46,6 @@ P47_3P[["sample"]] <- "3p"
 P47_5P[["sample"]] <- "5p"
 samples.list <- list(P47_3P, P47_5P)
 
-# compute cut-off of max Q3+1.5*IQR (boxplot max)
-mt <- lapply(X = samples.list, FUN = function(x) {
-  x <- x@meta.data$percent.mt
-})
-mt_merged <- as.data.frame(unlist(mt))
-boxplot.stats(mt_merged$`unlist(mt)`)
-
 samples.list <- lapply(X = samples.list, FUN = function(x) {
   x <- subset(x, subset = percent.mt < 5.0)
 })

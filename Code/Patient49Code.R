@@ -16,11 +16,11 @@ library(ROCR)
 library(sctransform)
 
 
-#JLE50 5&3 P Objects
+#P49 5&3 P Objects
 
 ##Load Data
-P493P.data <- Read10X(data.dir = "~/02_MethodsProject/01_DataFiles/JLE50_3p/filtered_feature_bc_matrix/")
-P495P.data <- Read10X(data.dir = "~/02_MethodsProject/01_DataFiles/JLE50_5p/filtered_feature_bc_matrix/")
+P493P.data <- Read10X(data.dir = "~/filtered_feature_bc_matrix/")
+P495P.data <- Read10X(data.dir = "~/filtered_feature_bc_matrix/")
 
 ##Create Objects
 P493P <- CreateSeuratObject(P493P.data, project = "p493p", min.cells = 3, min.features = 200)
@@ -41,26 +41,12 @@ P495P[["sample"]] <- "P495P"
 samples.list <- list(P493P, P495P)
 
 
-#RDS - P49 Objects
-saveRDS(P493P, file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/JLE503P.rds")
-saveRDS(P495P, file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/JLE505P.rds")
-
-
-
 #DOUBLET FINDER
 ##DoubletFinder info - https://github.com/chris-mcginnis-ucsf/DoubletFinder
-
-# compute cut-off of max Q3+1.5*IQR (boxplot max)
-mt <- lapply(X = samples.list, FUN = function(x) {
-  x <- x@meta.data$percent.mt
-})
-mt_merged <- as.data.frame(unlist(mt))
-boxplot.stats(mt_merged$`unlist(mt)`)
 
 samples.list <- lapply(X = samples.list, FUN = function(x) {
   x <- subset(x, subset = percent.mt < 5)
 })
-saveRDS(samples.list, file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated//JLE50samples.list.rds")
 #Standard QC workflow
 samples.list <- lapply(X = samples.list, FUN = function(x) {
   x <- SCTransform(x, method = "glmGamPoi", vars.to.regress = "percent.mt")
@@ -104,7 +90,6 @@ for (i in 1:length(samples.list)) {
   plot <- DimPlot(samples.list[[i]], reduction = "umap", group.by = "DF", pt.size = .7)
 }
 plot 
-saveRDS(samples.list, "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/50samples.list.withdoublets.rds")
 
 #remove doublets from objects
 samples.list <- lapply(X = samples.list, FUN = function(x) {
@@ -131,10 +116,6 @@ p49 <- IntegrateData(anchorset = samples.anchors, normalization.method = "SCT")
 p49
 
 
-#RDS file- Integrated
-saveRDS(p49, file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/JLE50.combined.rds")
-p49 <- readRDS(file = "~/02_MethodsProject/04_AllJLE50Analysis/03_JLE50Integrated/JLE50.combined.rds")
-
 ######################################### STANDARD WORKFLOW AFTER DOUBLET FINDER ################################################################################
 p49 <- RunPCA(p49, verbose = T)
 p49 <- RunUMAP(p49, dims = 1:30, verbose = T)
@@ -151,11 +132,6 @@ p49.markers <- FindAllMarkers(p49, only.pos = TRUE, min.pct = 0.25, logfc.thresh
 p49.markers %>%
   group_by(cluster) %>%
   slice_max(n = 2, order_by = avg_log2FC)
-
-# RDS file after clustering
-#Save Integrated object before cell typing
-saveRDS(p49, file = "~/02_MethodsProject/02_AllJLE48Analysis/03_Integrated_JLE48_Object/JLE48.combined.aftclust.rds")
-p49 <- readRDS(file = "~/02_MethodsProject/02_AllJLE48Analysis/03_Integrated_JLE48_Object/JLE48.combined.aftclust.rds")
 
 #RENAME IDENTS
 #Check active Ident in console

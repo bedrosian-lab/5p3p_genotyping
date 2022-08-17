@@ -16,10 +16,10 @@ library(ROCR)
 library(sctransform)
 
 #Load Data
-#JLE493P
-P483P.data <- Read10X(data.dir = "~/02_MethodsProject/01_DataFiles/JLE49_3/filtered_feature_bc_matrix/")
-#JLE495P
-P485P.data <- Read10X(data.dir = "~/02_MethodsProject/01_DataFiles/JLE49_5/filtered_feature_bc_matrix/")
+#P483P
+P483P.data <- Read10X(data.dir = "~/filtered_feature_bc_matrix/")
+#P485P
+P485P.data <- Read10X(data.dir = "~/filtered_feature_bc_matrix/")
 
 
 
@@ -29,7 +29,7 @@ P485P.data <- Read10X(data.dir = "~/02_MethodsProject/01_DataFiles/JLE49_5/filte
 #P483P
 P483P <- CreateSeuratObject(counts = P483P.data, project = "p483p", min.cells = 3, min.features = 200 )
 P483P
-#JLE495P
+#P48495P
 P485P <- CreateSeuratObject(counts = P485P.data, project = "p485p", min.cells = 3, min.features = 200)
 P485P
 
@@ -47,30 +47,12 @@ P483P[["sample"]] <- "P483P"
 P485P[["sample"]] <- "P485P"
 samples.list <- list(P483P, P485P)
 
-
-
-#RDS files - raw
-#P483P
-saveRDS(P483P, file = "~/02_MethodsProject/03_AllJLE49Analysis/03_IntegratedJLE49/JLE493P.rds")
-#P485P
-saveRDS(P485P, file = "~/02_MethodsProject/03_AllJLE49Analysis/03_IntegratedJLE49/JLE495P.rds")
-#Sample.list
-saveRDS(samples.list, file = "~/02_MethodsProject/03_AllJLE49Analysis/03_IntegratedJLE49/rawsample.list.rds")
-
 #DOUBLET FINDER
 ##DoubletFinder info - https://github.com/chris-mcginnis-ucsf/DoubletFinder
-
-# compute cut-off of max Q3+1.5*IQR (boxplot max)
-mt <- lapply(X = samples.list, FUN = function(x) {
-  x <- x@meta.data$percent.mt
-})
-mt_merged <- as.data.frame(unlist(mt))
-boxplot.stats(mt_merged$`unlist(mt)`)
 
 samples.list <- lapply(X = samples.list, FUN = function(x) {
   x <- subset(x, subset = percent.mt < 5.0)
 })
-saveRDS(samples.list, file = "~/02_MethodsProject/02_AllJLE48Analysis/03_Integrated_JLE48_Object/JLE49samples.list.rds")
 
 #Standard QC workflow
 samples.list <- lapply(X = samples.list, FUN = function(x) {
@@ -115,16 +97,11 @@ for (i in 1:length(samples.list)) {
   plot <- DimPlot(samples.list[[i]], reduction = "umap", group.by = "DF", pt.size = .7)
 }
 plot 
-saveRDS(samples.list, file = "~/02_MethodsProject/03_AllJLE49Analysis/03_IntegratedJLE49/49samples.list.withdoublets.rds")
 
 # remove doublets from objects - MOST IMPORTANT PART
 samples.list <- lapply(X = samples.list, FUN = function(x) {
   x <- subset(x, subset = DF == "Singlet")
 })
-
-
-#RDS file- rmv Doublets
-saveRDS(samples.list, file = "~/02_MethodsProject/03_AllJLE49Analysis/03_IntegratedJLE49/49samples.list.rmvdoublets.rds")
 
 ######################################################## INtegration Following DOublet Finder ##################################################
 
@@ -137,9 +114,6 @@ samples.anchors <- FindIntegrationAnchors(object.list = samples.list, normalizat
 p48 <- IntegrateData(anchorset = samples.anchors, normalization.method = "SCT")
 p48
 
-#Save RDS file - Integrated
-saveRDS(p48, file = "~/02_MethodsProject/03_AllJLE49Analysis/03_IntegratedJLE49/p48.combined.rds")
-p48 <- readRDS("~/02_MethodsProject/03_AllJLE49Analysis/03_IntegratedJLE49/p48.combined.rds")
 ######################################### STANDARD WORKFLOW AFTER DOUBLET FINDER ################################################################################
 p48 <- RunPCA(p48, verbose = T)
 p48 <- RunUMAP(p48, dims = 1:30, verbose = T)

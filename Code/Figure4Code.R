@@ -194,8 +194,11 @@ p47_markers <- FeaturePlot(p47,
                                         #excitatory neuron marker
                                         "SLC17A7",
                                         #CGE 
-                                        "SKAP1",
-                                        "GRIP1"), 
+                                        "SKAP1"), 
                            reduction = "tsne",
-                           label = F)
+                           label = F) & NoLegend() & NoAxes()
 p47_markers
+
+DimPlot(p47, label = T, reduction = "tsne") + NoAxes() + NoLegend()
+
+p47 <- RenameIdents(p47, 'CGE-derived Imternuerons' = "CGE-derived Interneurons", 'MGE-derive Interneurons' = "MGE-derived Interneurons")
