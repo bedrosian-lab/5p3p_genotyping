@@ -1,0 +1,243 @@
+---
+title: "Tutorial Script"
+output: html_document
+---
+Tutorial Script for ""
+Data was obtained from Prashant et al. (https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-021-07974-8)
+#LOAD LIBRARIES
+```{r setup, include=FALSE}
+library(Seurat)
+library(dplyr)
+library(patchwork)
+library(glmGamPoi)
+library(ggplot2)
+library(tidyverse)
+library(DoubletFinder)
+library(Matrix)
+library(parallel)
+library(fields)
+library(cowplot)
+library(scCATCH)
+library(KernSmooth)
+library(ROCR)
+library(sctransform)
+```
+
+#CREATE SEURAT OBJECT
+```{r}
+tutorial.data <- Read10X("~/02_MethodsProject/14_TutorialScript/filtered_feature_bc_matrix")
+
+tudata <- CreateSeuratObject(counts = tutorial.data, project = "tutorialdata", min.cells = 3, min.features = 200)
+```
+
+#ANNOTATIONS
+```{r}
+##Stash QC stats for both objects 
+#Percent Mitochondrial
+tudata <- PercentageFeatureSet(tudata, pattern = "^MT-", col.name = "percent.mt")
+
+#Percent Ribosomal
+tudata <- PercentageFeatureSet(tudata, pattern = "^RP[SL]", col.name = "percent.ribo")
+
+tudata[["sample"]] <- "3p"
+samples.list <- list(tudata)
+```
+
+#DOUBLET FINDER
+```{r}
+#DoubletFinder info - https://github.com/chris-mcginnis-ucsf/DoubletFinder
+samples.list <- lapply(X = samples.list, FUN = function(x) {
+  x <- subset(x, subset = percent.mt < 5.0)
+})
+#Standard QC workflow
+samples.list <- lapply(X = samples.list, FUN = function(x) {
+  x <- SCTransform(x, method = "glmGamPoi", vars.to.regress = "percent.mt")
+  x <- RunPCA(x, verbose = T)
+  x <- RunUMAP(x, dims = 1:30)
+  x <- RunTSNE(x, dims = 1:30)
+})
+
+# run sweep stats
+sweep.stats.list <- list()
+pk.vec <- vector()
+for (i in 1:length(samples.list)) {
+  samples_temp <- samples.list[[i]]
+  sweep.res.list <- paramSweep_v3(samples_temp, PCs = 1:30, sct = TRUE)
+  sweep.stats <- summarizeSweep(sweep.res.list, GT = FALSE)
+  bcmvn <- find.pK(sweep.stats)
+  pk.vec[[i]] <- as.numeric(as.vector(top_n(bcmvn,1,BCmetric)[["pK"]]))
+  sweep.stats.list[[i]] <- sweep.stats
+}
+
+# manually put in your expected doublet rate for each sample based on 10x genomics documentation
+doubletrate.vec <- (.072)
+
+# run doublet finder for each sample
+for (i in 1:length(samples.list)) {
+  samples_temp <- samples.list[[i]]
+  nExp_poi <- doubletrate.vec[i]*nrow(samples_temp@meta.data)
+  samples_temp <- doubletFinder_v3(samples_temp, PCs = 1:30, pN = 0.25, pK = pk.vec[i], nExp = nExp_poi, reuse.pANN = FALSE, sct = T)
+  samples.list[[i]] <- samples_temp
+}
+
+# create a metadata category named "DF" in each Seurat object that is the same as the DF.classifications_... 
+# that will combine when the sets are integrated
+#Makes if easier to call later
+for (i in 1:length(samples.list)) {
+  samples.list[[i]]@meta.data[["DF"]] <- samples.list[[i]]@meta.data[[10]]
+}
+
+# manual step - take a look at the doublets on a plot
+for (i in 1:length(samples.list)) {
+  plot <- DimPlot(samples.list[[i]], reduction = "umap", group.by = "DF", pt.size = .7)
+}
+plot
+plot + NoLegend()
+
+# remove doublets from objects - MOST IMPORTANT PART
+samples.list <- lapply(X = samples.list, FUN = function(x) {
+  x <- subset(x, subset = DF == "Singlet")
+})
+
+
+```
+
+#STANDARD WORKFLOW
+```{r}
+tudata <- SCTransform(tudata, vars.to.regress = "percent.mt", verbose = FALSE)
+tudata <- SCTransform(tudata, method = "glmGamPoi", vars.to.regress = "percent.mt", verbose = FALSE)
+
+tudata <- RunPCA(tudata, verbose = T)
+tudata <- RunUMAP(tudata, dims = 1:30, verbose = T)
+tudata <- RunTSNE(tudata, dims = 1:30, verbose = T, perplexity = 30)
+
+tudata <- FindNeighbors(tudata, dims = 1:30, verbose = FALSE)
+tudata <- FindClusters(tudata, verbose = FALSE)
+DimPlot(tudata, reduction = 'umap', label =T)
+```
+
+#CELL TYPING
+```{r}
+#Cell Type - Used Cell Types from paper 
+tudata <- RenameIdents(tudata,
+                    '0' = 'Neurons',
+                    '1' = 'Erthrocytes',
+                    '2' = 'Neurons',
+                    '3' = 'MEP',
+                    '4' = 'MEP',
+                    '5' = 'Erthrocytes',
+                    '6' = 'Neurons',
+                    '7' = 'Neurons',
+                    '8' = 'MEP',
+                    '9' = 'Neurons',
+                    '10' = 'Macrophages', 
+                    '11' = 'MEP',
+                    '12' = 'Neurons',
+                    '13' = 'MEP',
+                    '14' = 'Erthrocytes',
+                    '15' = 'Erthrocytes',
+                    '16' = 'Erthrocytes',
+                    '17' = 'Erthrocytes',
+                    '18' = 'Erthrocytes')
+DimPlot(tudata, reduction = 'umap')
+saveRDS(tudata, file = "~/02_MethodsProject/14_TutorialScript/tuturiolscript.aftCT.rds")
+```
+
+#EXTRACT SINGLE CELL VARIANT INFORMATION USING VARTRIX
+```{r}
+## Use vartrix to extract single cell varint information
+#Recuired files:
+# - VCF file (-v)
+# - Bam file (-b)
+# - Barcodes (-c)
+# - Fasta (-f)
+#In Terminal
+
+##Install Vartrix 
+#https://github.com/10XGenomics/vartrix 
+
+##Load Vartrix
+module load vartrix_1.1.22
+
+##Run vartrix with
+vartrix -v /SRR10156295.KM2.CENPF_v2.vcf -b /221129_sra_SRR10156295/outs/possorted_genome_bam.bam -f /refdata-gex-GRCh38-2020-A/fasta/genome.fa -c /221129_sra_SRR10156295/outs/filtered_feature_bc_matrix/barcodes.tsv.gz -o ./results_CENPF_v2.t2.mtx
+
+## Reformat variants
+# print variant chromosomal coordinates
+awk '{print $1,$2}' SRR10156295.KM2.CENPF_v2.vcf > SNV.loci.txt 
+
+# append ":" to variant coordinates
+sed -i 's/\s/:/g' SNV.loci.txt 
+
+```
+
+#ADD VARINT INFORMATION TO SEURAT OBJECT METADATA
+```{r}
+setwd("~/02_MethodsProject/14_TutorialScript/CENPFVariantAnalysis/")
+# Read in the sparse genotype matrix from vartrix output
+snv_matrix <- readMM("results_CENPF_v2.t2.mtx")
+
+# convert the matrix to a dataframe
+snv_matrix <- as.data.frame(as.matrix(snv_matrix))
+
+#read in the cell barcodes (Cell Ranger Output)
+barcodes <- read.table("~/02_MethodsProject/14_TutorialScript/filtered_feature_bc_matrix/barcodes.tsv.gz")
+
+# read in SNV loci (Reformated variant information)
+snps <- read.table("SNV.loci.txt", header = F)
+
+# Construct the final table to add to the Seurat object
+#Assign Column names
+colnames(snv_matrix) <- barcodes$V1
+
+#Assign rownames
+row.names(snv_matrix) <- snps$V1
+
+#Pull unique variant for from snps
+gt_chr1_214614989 <- data.frame(t((snv_matrix[1,])))
+
+# Construct the data.frame
+row.names(gt_chr1_214614989) <- barcodes$V1
+
+# rename column to gene name
+colnames(gt_chr1_214614989)[1] <- "CENPF"
+
+# Reassign Variables from consensus scoring mode (`-s consensus`)
+# No reads detected
+gt_chr1_214614989$CENPF <- str_replace(as.character(gt_chr1_214614989$CENPF), "0", "No Call")
+# Only ref alleles detected
+gt_chr1_214614989$CENPF <- str_replace(as.character(gt_chr1_214614989$CENPF), "1", "ref")
+# Only alt alleles detected
+gt_chr1_214614989$CENPF <- str_replace(as.character(gt_chr1_214614989$CENPF), "2", "alt")
+# Both alleles detected
+gt_chr1_214614989$CENPF <- str_replace(as.character(gt_chr1_214614989$CENPF), "3", "alt/ref")
+
+#Change alt/ref to alt - As one alt call means somatic variant is present
+gt_chr1_214614989$CENPF <- recode(gt_chr1_214614989$CENPF, 'alt/ref' = "alt")
+
+#Add Somatic variant information to Metadata
+tudata <- AddMetaData(object = tudata, metadata = gt_chr1_214614989)
+
+```
+
+#NUMBER OF GENOTYPED CALLS
+```{r}
+#Number of Genotyped Calls
+table(as.data.frame(tudata@meta.data$CENPF))
+```
+
+#DISTRIBUTION OF VARIANT CALLS
+```{r}
+#Distribution of Variant Calls in Tutorial Dataset
+tudata_combined_umap <- DimPlot(object = tudata,
+                                   label = T,
+                                   cols = c("azure2", "yellow","red", "black"),
+                                   pt.size = 2, reduction= "umap",
+                                   group.by = "CENPF", 
+                                   label.size = 0.0, 
+                                   order = c("alt","ref","No Call" )) +
+  ggtitle("CENPF mutation in Patient Tutorial GEX") 
+tudata_combined_umap
+#Variant is present in Neurons, MEPs, and Erthrocytes
+```
+
