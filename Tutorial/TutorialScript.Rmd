@@ -25,7 +25,7 @@ library(sctransform)
 
 #CREATE SEURAT OBJECT
 ```{r}
-tutorial.data <- Read10X("~/02_MethodsProject/14_TutorialScript/filtered_feature_bc_matrix")
+tutorial.data <- Read10X("filtered_feature_bc_matrix")
 
 tudata <- CreateSeuratObject(counts = tutorial.data, project = "tutorialdata", min.cells = 3, min.features = 200)
 ```
